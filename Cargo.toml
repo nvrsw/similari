@@ -56,11 +56,9 @@ opt-level = 3
 
 [profile.release]
 opt-level = 3
-codegen-units = 1
 
 [profile.bench]
 opt-level = 3
-codegen-units = 1
 
 [package.metadata.maturin]
 python-source = "python"
