@@ -85,8 +85,8 @@ impl Universal2DBoxKalmanFilter {
     ///
     pub fn predict(&self, state: &KalmanState<DIM_2D_BOX_X2>) -> KalmanState<DIM_2D_BOX_X2> {
         let (mean, covariance) = (state.mean, state.covariance);
-        let std_pos = self.std_position(1.0, 1e-2, mean[4]);
-        let std_vel = self.std_velocity(1.0, 1e-5, mean[4]);
+        let std_pos = self.std_position(1.0, 1.0, mean[4]);
+        let std_vel = self.std_velocity(1.0, 1.0, mean[4]);
 
         let mut std: SVector<f32, DIM_2D_BOX_X2> =
             SVector::from_iterator(std_pos.into_iter().chain(std_vel));
