@@ -26,6 +26,8 @@ pub struct Sort {
     opts: Arc<SortAttributesOptions>,
     auto_waste: AutoWaste,
     track_id: u64,
+    prev_bboxes: HashMap<Option<i64>, usize>,
+    min_track_length: usize,
 }
 
 impl Sort {
@@ -47,6 +49,7 @@ impl Sort {
         spatio_temporal_constraints: Option<SpatioTemporalConstraints>,
         kalman_position_weight: f32,
         kalman_velocity_weight: f32,
+        min_track_length: usize,
     ) -> Self {
         assert!(bbox_history > 0);
         let epoch_db = RwLock::new(HashMap::default());
@@ -84,6 +87,8 @@ impl Sort {
                 periodicity: DEFAULT_AUTO_WASTE_PERIODICITY,
                 counter: DEFAULT_AUTO_WASTE_PERIODICITY,
             },
+            prev_bboxes: HashMap::new(),
+            min_track_length,
         }
     }
 
@@ -122,7 +127,30 @@ impl Sort {
         let mut rng = rand::thread_rng();
         let epoch = self.opts.next_epoch(scene_id).unwrap();
 
-        let tracks = bboxes
+        // Save detection result of current frame
+        let mut current_bboxes = HashMap::new();
+        for (_, id) in bboxes {
+            if let Some(id) = id {
+                let count = self.prev_bboxes.get(&Some(*id)).unwrap_or(&0) + 1;
+                current_bboxes.insert(Some(*id), count);
+            }
+        }
+
+        // Filter only objects more than min_track_length
+        let filtered_bboxes: Vec<_> = bboxes
+            .iter()
+            .filter(|(_, id)| {
+                if let Some(id) = id {
+                    if let Some(count) = current_bboxes.get(&Some(*id)) {
+                        return *count >= self.min_track_length;
+                    }
+                }
+                false
+            })
+            .cloned()
+            .collect();
+
+        let tracks = filtered_bboxes
             .iter()
             .map(|(bb, custom_object_id)| {
                 self.store
@@ -191,6 +219,9 @@ impl Sort {
             let track = store.get(&track_id).unwrap();
             res.push(SortTrack::from(track));
         }
+
+        // Save detection results of current frame to prev_bboxes
+        self.prev_bboxes = current_bboxes;
 
         res
     }
@@ -288,6 +319,7 @@ mod tests {
             None,
             1.0 / 20.0,
             1.0 / 160.0,
+            1,
         );
         assert_eq!(t.current_epoch(), 0);
         let bb = BoundingBox::new(0.0, 0.0, 10.0, 20.0);
@@ -352,6 +384,7 @@ mod tests {
             None,
             1.0 / 20.0,
             1.0 / 160.0,
+            1,
         );
         let bb = BoundingBox::new(0.0, 0.0, 10.0, 20.0);
         assert_eq!(t.current_epoch_with_scene(1), 0);
@@ -380,6 +413,7 @@ mod tests {
             None,
             1.0 / 20.0,
             1.0 / 160.0,
+            1,
         );
         let bb = BoundingBox::new(0.0, 0.0, 10.0, 20.0);
 
@@ -405,6 +439,7 @@ mod tests {
             None,
             1.0 / 20.0,
             1.0 / 160.0,
+            1,
         );
         let bb = BoundingBox::new(0.0, 0.0, 10.0, 20.0);
 
@@ -490,6 +525,7 @@ pub mod python {
                 spatio_temporal_constraints.map(|x| x.0),
                 kalman_position_weight,
                 kalman_velocity_weight,
+                1,
             ))
         }
 
