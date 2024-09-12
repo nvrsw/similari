@@ -150,7 +150,37 @@ impl Sort {
                 .unwrap()
                 .foreign_track_distances(tracks.clone(), 0, false);
         assert!(errs.all().is_empty());
-        let dists = dists.all();
+
+        let (wasted_dists, _) =
+            self.wasted_store
+                .write()
+                .unwrap()
+                .foreign_track_distances(tracks.clone(), 0, false);
+
+        let mut all_dists = dists.all();
+        all_dists.extend(wasted_dists.all());
+
+        for dist in &mut all_dists {
+            let track_id = dist.to;
+
+            if let Some(track) = self
+                .store
+                .read()
+                .unwrap()
+                .get_store(track_id as usize)
+                .get(&track_id)
+            {
+                let last_update = track.get_attributes().last_updated_epoch;
+                let epoch_diff = epoch - last_update;
+
+                if let Some(ref mut distance) = dist.attribute_metric {
+                    *distance -= epoch_diff as f32 * 0.1;
+                } else {
+                    dist.attribute_metric = Some(epoch_diff as f32 * 0.1);
+                }
+            }
+        }
+
         let voting = SortVoting::new(
             match self.method {
                 PositionalMetricType::Mahalanobis => MAHALANOBIS_NEW_TRACK_THRESHOLD,
@@ -159,7 +189,7 @@ impl Sort {
             num_candidates,
             self.store.read().unwrap().shard_stats().iter().sum(),
         );
-        let winners = voting.winners(dists);
+        let winners = voting.winners(all_dists);
         let mut res = Vec::default();
 
         for mut t in tracks {
