@@ -151,11 +151,12 @@ impl Sort {
                 .foreign_track_distances(tracks.clone(), 0, false);
         assert!(errs.all().is_empty());
 
-        let (wasted_dists, _) =
+        let (wasted_dists, errs) =
             self.wasted_store
                 .write()
                 .unwrap()
                 .foreign_track_distances(tracks.clone(), 0, false);
+        assert!(errs.all().is_empty());
 
         let mut all_dists = dists.all();
         all_dists.extend(wasted_dists.all());
