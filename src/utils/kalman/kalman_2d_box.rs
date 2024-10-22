@@ -8,6 +8,7 @@ use nalgebra::{SMatrix, SVector};
 
 pub const DIM_2D_BOX: usize = 5;
 pub const DIM_2D_BOX_X2: usize = DIM_2D_BOX * 2;
+const ASPECT_WEIGHT: f32 = 0.5;
 
 /// Kalman filter
 ///
@@ -136,7 +137,7 @@ impl Universal2DBoxKalmanFilter {
             measurement.xc,
             measurement.yc,
             measurement.angle.unwrap_or(0.0),
-            measurement.aspect,
+            measurement.aspect * ASPECT_WEIGHT,
             measurement.height,
         ]) - projected_mean;
 
@@ -157,7 +158,7 @@ impl Universal2DBoxKalmanFilter {
                 measurement.xc,
                 measurement.yc,
                 measurement.angle.unwrap_or(0.0),
-                measurement.aspect,
+                measurement.aspect * ASPECT_WEIGHT,
                 measurement.height,
             ]);
             r.sub_assign(&mean);
